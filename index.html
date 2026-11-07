@@ -258,4 +258,13 @@ setInterval(()=>{
 function wave(kind,t){const s=state,f=s.hr||80,rr=s.rr||14,r=s.rhythm;if(kind==='ecg'){if(r==='asystole')return .5+Math.sin(t*12)*.003;if(r==='vf')return .5+.19*Math.sin(t*19)+.12*Math.sin(t*31)+.08*Math.sin(t*53);if(r==='vf_fine')return .5+.032*Math.sin(t*19)+.022*Math.sin(t*31)+.012*Math.sin(t*53);let rate=f/60,p=t*rate%1;if(r==='vt'||r==='vt_pulse')return .5-.38*Math.sin(Math.PI*Math.min(1,p/.65))*(p<.65?1:0);return .55-.07*Math.exp(-(((p-.17)/.055)**2))+.09*Math.exp(-(((p-.38)/.018)**2))-.42*Math.exp(-(((p-.41)/.012)**2))+.14*Math.exp(-(((p-.44)/.02)**2))-.10*Math.exp(-(((p-.7)/.11)**2))}if(kind==='resp')return (s.apnea&&!s.ventilate)||(!s.apnea&&!rr)?.5:.5+.29*Math.sin(2*Math.PI*t*(s.apnea&&s.ventilate?12:rr)/60);if(kind==='pleth'){if(!s.pulse||!canHavePulse(r))return .8;let p=t*f/60%1;return .78-.5*Math.exp(-(((p-.17)/.13)**2))-.12*Math.exp(-(((p-.46)/.065)**2))}if(s.apnea&&!s.ventilate)return .82;let p=t*(s.apnea&&s.ventilate?12:rr)/60%1,v=p<.14?p/.14:p<.53?1:p<.68?1-(p-.53)/.15:0;return .82-(s.apnea&&!s.ventilate?0:v)*(s.et/100)*.72-.015*Math.sin(t*5)}
 function draw(id,kind,color){const c=$(id),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.fillStyle='#03090b';ctx.fillRect(0,0,w,h);ctx.strokeStyle=color;ctx.lineWidth=2.2;ctx.beginPath();for(let x=0;x<w;x++){const t=phase+x/w*5,y=wave(kind,t)*h;x?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke()}
 function render(){draw('ecg','ecg','#5bff77');draw('pleth','pleth','#55dfff');draw('capno','capno','#ffe06b');draw('resp','resp','#f3f5f7');phase+=.035;requestAnimationFrame(render)}syncUI();render();
-</script></body></html>
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .catch(error => console.error('Error Service Worker:', error));
+  });
+}
+</script>
+</body></html>
