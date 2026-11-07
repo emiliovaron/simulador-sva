@@ -9,13 +9,13 @@
 <body style="font-family:Arial;padding:24px">
   <h2>Simulador SVA</h2>
   <p>Prueba de conexión con Firebase</p>
-  <p id="resultado">Comprobando conexión...</p>
+  <button id="loginGoogle">Iniciar sesión como profesor con Google</button>
 
   <script type="module">
     import { initializeApp } from
       "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
 
-    import { getAuth } from
+    import { getAuth, GoogleAuthProvider, signInWithPopup } from
       "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 
     import { getDatabase } from
@@ -34,7 +34,19 @@
     try {
       const app = initializeApp(firebaseConfig);
       const auth = getAuth(app);
-      const database = getDatabase(app);
+      const provider = new GoogleAuthProvider();
+
+document.getElementById("loginGoogle").onclick = async () => {
+  try {
+    const result = await signInWithPopup(auth, provider);
+
+    document.getElementById("resultado").textContent =
+      "Sesión iniciada correctamente. UID: " + result.user.uid;
+  } catch (error) {
+    document.getElementById("resultado").textContent =
+      "Error al iniciar sesión: " + error.code;
+  }
+};
 
       document.getElementById("resultado").textContent =
         "Configuración Firebase cargada correctamente.";
