@@ -1,0 +1,47 @@
+
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prueba Firebase - Simulador SVA</title>
+</head>
+<body style="font-family:Arial;padding:24px">
+  <h2>Simulador SVA</h2>
+  <p>Prueba de conexión con Firebase</p>
+  <p id="resultado">Comprobando conexión...</p>
+
+  <script type="module">
+    import { initializeApp } from
+      "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+
+    import { getAuth } from
+      "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+
+    import { getDatabase } from
+      "https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCJq6VgXi5yaY62OZv4XqKxHjSt4i60qxk",
+      authDomain: "simulador-sva.firebaseapp.com",
+      databaseURL: "https://simulador-sva-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "simulador-sva",
+      storageBucket: "simulador-sva.firebasestorage.app",
+      messagingSenderId: "266696612296",
+      appId: "1:266696612296:web:562471f797fa343eb748fd"
+    };
+
+    try {
+      const app = initializeApp(firebaseConfig);
+      const auth = getAuth(app);
+      const database = getDatabase(app);
+
+      document.getElementById("resultado").textContent =
+        "Configuración Firebase cargada correctamente.";
+    } catch (error) {
+      document.getElementById("resultado").textContent =
+        "Error: " + error.message;
+    }
+  </script>
+</body>
+</html>
