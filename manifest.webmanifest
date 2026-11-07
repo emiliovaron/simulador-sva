@@ -2,7 +2,7 @@
   "name": "Simulador SVA · Monitor desfibrilador",
   "short_name": "Simulador SVA",
   "description": "Simulador docente de monitor desfibrilador, no destinado a uso clínico",
-  "start_url": "./sva-fisiologia-audio-v7-fc-dinamica.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#101820",
