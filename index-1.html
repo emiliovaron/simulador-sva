@@ -1,0 +1,208 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Simulador SVA · Fisiología y audio v7 · FC dinámica</title><style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#101820;color:#edf3f7;font:16px system-ui}header{background:#253442;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}h1{font-size:20px;margin:0}.small{font-size:12px;color:#c2cbd0}.panel{background:#1d2b35;margin:12px;padding:14px;border-radius:12px}.screen{background:#03090b;margin:12px;border:5px solid #52616a;border-radius:15px;padding:12px}.line{display:flex;align-items:center;border-bottom:1px solid #26343b;gap:10px}.line canvas{width:100%;height:100px;min-width:0}.num{width:78px;text-align:right;font-size:28px;font-weight:bold}.green{color:#5bff77}.cyan{color:#55dfff}.yellow{color:#ffe06b}.white{color:#f3f5f7}.controls{display:flex;gap:9px;flex-wrap:wrap;margin:10px 0}button,select,input{font:inherit;padding:9px;border-radius:8px;border:1px solid #82919b;background:#263b4c;color:white}button{cursor:pointer}button:disabled{opacity:.35}label{display:inline-flex;gap:6px;align-items:center;margin:5px}.danger{background:#a52826}.teacher{display:none}.teacher.show{display:block}#status,#connection{color:#ffe06b;font-weight:600}#log{max-height:220px;overflow:auto;font-size:13px}#log div{padding:5px;border-bottom:1px solid #42515a}#report{display:none;background:white;color:#111;padding:24px}#report table{width:100%;border-collapse:collapse}#report td,#report th{border:1px solid #aaa;padding:7px}@media(min-width:900px){.layout{display:grid;grid-template-columns:minmax(0,1fr) 350px}}@media print{body>*:not(#report){display:none!important}#report{display:block!important}}
+
+/* Indicador visual de descarga recuperado de la versión original */
+@keyframes svaFlashReady {0%,49%{background:#ffd21f;color:#151515;box-shadow:0 0 15px #ffc400}50%,100%{background:#b32623;color:#fff;box-shadow:0 0 8px #b32623}}
+#shock.sva-ready:not(:disabled){animation:svaFlashReady .7s steps(1,end) infinite;font-weight:800;border:2px solid #ffe16c;opacity:1}
+#charge.sva-charging{background:#b98200;color:#fff;font-weight:700}
+@media (prefers-reduced-motion:reduce){#shock.sva-ready:not(:disabled){animation-duration:1.5s}}
+</style><meta name="theme-color" content="#101820"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Simulador SVA"><link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./icon-192.png"></head><body>
+<header><h1>SIMULADOR SVA · FISIOLOGÍA V7 <span class="small">· Uso docente, no clínico</span></h1><span id="connection">Sin conectar</span></header>
+<div class="panel"><h2>Sesión compartida</h2><p class="small">Abre esta misma página en móvil, iPad, tablet y pizarra. Solo el profesor puede crear o reiniciar la sesión.</p><div class="controls"><button id="login">Entrar con Google (profesor)</button><button id="logout" hidden>Salir de Google</button><button id="create" disabled>Crear sesión de clase</button></div><label>Código de sesión <input id="room" maxlength="8" autocomplete="off" placeholder="Ej. ABCD1234" style="width:160px;text-transform:uppercase"></label><button id="join">Unirse</button><p id="role" class="small">Sin identificar</p><p id="hint" class="small">El profesor crea una sesión y comparte el código. Los alumnos y la pizarra se unen con el mismo código.</p></div>
+<div class="layout"><main><div class="screen"><div class="line"><span class="green">ECG<br><small>FC (lpm)</small></span><canvas id="ecg" width="800" height="100"></canvas><b class="num green" id="hr">80</b></div><div class="line"><span class="cyan">SpO₂</span><canvas id="pleth" width="800" height="100"></canvas><b class="num cyan" id="spo">98%</b></div><div class="line"><span class="yellow">EtCO₂</span><canvas id="capno" width="800" height="100"></canvas><b class="num yellow" id="et">35</b></div><div class="line"><span class="white">RESP</span><canvas id="resp" width="800" height="100"></canvas><b class="num white" id="respNum">14</b></div><p><strong>Circulación efectiva: <span id="perfusion" style="color:#5bff77">PULSO PRESENTE</span></strong> · <span id="recoveryProgress" style="color:#ffe06b"></span></p><p>TA <b id="bp">120/80</b> mmHg · PAM <b id="map">93</b> · FR <b id="rr">14</b>/min · Descargas <b id="shocks">0</b></p></div>
+<div class="panel"><h2>Desfibrilador manual</h2><label>Energía <select id="energy"><option>50</option><option>100</option><option>120</option><option>150</option><option selected>200</option><option>300</option><option>360</option></select> J</label><label><input type="checkbox" id="sync"> SYNC</label><div class="controls"><button id="charge">CARGAR</button><button id="shock" class="danger" disabled>DESCARGAR</button><button id="disarm" disabled>DESARMAR</button></div><p id="status">Listo</p><p class="small">Carga simulada de 3 segundos. En ritmos no desfibrilables el alumno debe reconocer que la descarga no está indicada. Este simulador no reproduce un dispositivo clínico real.</p></div>
+<div class="panel"><h2>Sonido y alarmas</h2><p class="small">Cada dispositivo necesita activar el audio una vez (Safari en iPad lo exige). Sonido de latido ECG, carga y descarga; en FV y asistolia no hay pitido de latido.</p><button id="sound" style="background:#125f50;border:2px solid #72e3b1;font-weight:750">🔊 ACTIVAR SONIDO EN ESTE DISPOSITIVO</button><label><input type="checkbox" id="alarms" checked> Alarmas</label><p id="alarmStatus" class="small">Audio desactivado</p></div>
+<div class="panel"><h2>Presión arterial no invasiva</h2><button id="nibp">INICIAR MEDICIÓN TA</button> <span id="nibpStatus" class="small">Última lectura: 120/80</span></div></main>
+<aside><div class="panel"><h2>RCP</h2><button id="cpr">Iniciar cronómetro</button> <b id="timer">00:00</b> <button id="reset">Reiniciar</button></div>
+<div class="panel teacher" id="teacher"><h2>Control exclusivo del profesor</h2><p><strong>Fisiología automática activa</strong> · <span class="small" id="physInfo">Los parámetros evolucionan según el ritmo y oscilan suavemente cuando el paciente está estable.</span></p><p class="small">Cambia cualquier constante aquí y se respetará tu valor manual hasta el próximo cambio de ritmo o hasta pulsar «Reanudar automatismo». No hace falta cambiar de modo.</p><button id="resumeAuto">Reanudar automatismo en todos los parámetros</button><label>Ritmo <select id="rhythm"><option value="sinus">Sinusal</option><option value="vf">FV gruesa</option><option value="vf_fine">FV fina</option><option value="vt_pulse">TV con pulso</option><option value="vt">TV sin pulso</option><option value="asystole">Asistolia</option><option value="pea">AESP</option><option value="brady">Bradicardia</option><option value="tachy">Taquicardia</option></select></label><p><label>FC <input type="number" id="hrIn" min="0" max="250" value="80" style="width:80px"></label><label>SpO₂ <input type="number" id="spoIn" min="0" max="100" value="98" style="width:75px"></label><label>EtCO₂ <input type="number" id="etIn" min="0" max="100" value="35" style="width:75px"></label><label>FR <input type="number" id="rrIn" min="0" max="60" value="14" style="width:75px"></label><label>TA sistólica <input type="number" id="sysIn" min="0" max="300" value="120" style="width:85px"></label><label>TA diastólica <input type="number" id="diaIn" min="0" max="200" value="80" style="width:85px"></label></p><label><input type="checkbox" id="pulse" checked> Pulso presente</label><p class="small">TV con pulso: mismo ECG que TV sin pulso, pero con perfusión efectiva. En TV inestable con pulso puede estar indicada cardioversión sincronizada; en TV sin pulso, RCP y desfibrilación. Los valores son orientativos.</p><label><input type="checkbox" id="apnea"> Apnea</label><p><label>Tras descarga <select id="after"><option value="same">Sin cambio</option><option value="sinus">Sinusal / RCE</option><option value="asystole">Asistolia</option><option value="pea">AESP</option></select></label></p><button id="roscTeacher">RCE: iniciar recuperación progresiva</button> <button id="restore">Restablecer paciente</button></div></aside></div>
+<div class="panel"><h2>Registro SVA</h2><label>Escenario <select id="protocol"><option value="conv">FV/TVSP · convencional</option><option value="triple">Parada monitorizada · hasta 3 descargas rápidas</option><option value="refract">FV/TVSP persistente / refractaria</option><option value="nonshock">Asistolia / AESP</option></select></label><div class="controls"><button id="epi">Registrar adrenalina 1 mg</button><button id="amio300">Amiodarona 300 mg</button><button id="amio150">Amiodarona 150 mg</button><button id="roscc">Marcar RCE</button><button id="endcase">Finalizar e informe</button></div><p class="small">Los botones registran intervenciones docentes, no administran medicación. Las pautas deben contrastarse con el protocolo vigente.</p><div id="log">Sin intervenciones.</div></div>
+<div id="report"><h2>Simulador SVA — Informe docente</h2><p id="reportMeta"></p><table><thead><tr><th>Tiempo</th><th>Actuación</th></tr></thead><tbody id="reportRows"></tbody></table><button onclick="window.print()">Guardar PDF / imprimir</button></div>
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import{getAuth,GoogleAuthProvider,signInWithPopup,signInWithRedirect,getRedirectResult,signInAnonymously,onAuthStateChanged,signOut}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import{getDatabase,ref,get,set,update,onValue,push,serverTimestamp,runTransaction}from'https://www.gstatic.com/firebasejs/11.10.0/firebase-database.js';
+const config={apiKey:'AIzaSyCJq6VgXi5yaY62OZv4XqKxHjSt4i60qxk',authDomain:'simulador-sva.firebaseapp.com',databaseURL:'https://simulador-sva-default-rtdb.europe-west1.firebasedatabase.app',projectId:'simulador-sva',storageBucket:'simulador-sva.firebasestorage.app',messagingSenderId:'266696612296',appId:'1:266696612296:web:562471f797fa343eb748fd'};
+const TEACHER='icGYnV2EhjRr8ZjOrSAddtNM1Ot2';
+const app=initializeApp(config),auth=getAuth(app),db=getDatabase(app),$=id=>document.getElementById(id);
+const defaults=()=>({rhythm:'sinus',hr:80,spo:98,et:35,rr:14,sys:120,dia:80,pulse:true,apnea:false,after:'same',energy:200,sync:false,charge:'idle',shocks:0,status:'Listo',cprElapsed:0,cprStarted:0,protocol:'conv',nibp:'Última lectura: 120/80',events:[],autoPhys:true,manualOverrides:{},physSince:0,physFrom:null,physMode:'normal'});
+let user=null,room='',unsub=null,remote=false,state=defaults(),phase=0,audio=null,soundOn=false,chargeTimer=null,chargeStarted=0;
+let chargingOsc=null,chargingGain=null,lastCharge='idle',lastShocks=0,audioReady=false;
+const isTeacher=()=>user?.uid===TEACHER;const validRoom=x=>/^[A-Z0-9]{8}$/.test(x);const clamp=(v,min,max)=>Math.min(max,Math.max(min,Number(v)||0));
+const fmt=seconds=>{let n=Math.max(0,Math.floor(seconds));return String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0')};
+function seconds(){return ((state.cprElapsed||0)+(state.cprStarted?Math.max(0,Date.now()-state.cprStarted):0))/1000}
+function syncUI(){remote=true;const s=state;updateDefibAudio(s);for(const [id,k] of Object.entries({rhythm:'rhythm',hrIn:'hr',spoIn:'spo',etIn:'et',rrIn:'rr',sysIn:'sys',diaIn:'dia',after:'after',energy:'energy',protocol:'protocol'}))if(document.activeElement!==$(id))$(id).value=s[k];$('physInfo').textContent=(s.physMode==='arrest'?'Parada · evolución automática':s.physMode==='rosc'?'RCE · recuperación progresiva':s.physMode==='vt_pulse'?'TV con pulso · perfusión presente':'Evolución automática')+(Object.keys(s.manualOverrides||{}).filter(k=>s.manualOverrides[k]).length?' · ajustes manuales: '+Object.keys(s.manualOverrides||{}).filter(k=>s.manualOverrides[k]).join(', '):'');$('perfusion').textContent=s.pulse&&canHavePulse(s.rhythm)?'PULSO PRESENTE':'SIN PULSO';$('perfusion').style.color=s.pulse&&canHavePulse(s.rhythm)?'#5bff77':'#ff7474';$('recoveryProgress').textContent=s.physMode==='rosc'&&s.physSince?'RCE · '+Math.min(100,Math.floor((Date.now()-s.physSince)/750))+'% de recuperación estimada':'';$('pulse').checked=!!s.pulse&&canHavePulse(s.rhythm);$('pulse').disabled=!canHavePulse(s.rhythm);$('apnea').checked=!!s.apnea;$('sync').checked=!!s.sync;$('hr').textContent=['vf','vf_fine','asystole'].includes(s.rhythm)?'—':s.hr;$('spo').textContent=((!s.pulse||!canHavePulse(s.rhythm))&&s.physSince&&Date.now()-s.physSince>8000)?'—':s.spo+'%';$('et').textContent=s.et;$('rr').textContent=s.apnea?0:s.rr;$('respNum').textContent=s.apnea?0:s.rr;$('bp').textContent=s.pulse&&canHavePulse(s.rhythm)?(s.sys>0&&s.dia>0?s.sys+'/'+s.dia:'Recuperándose…'):'—/—';$('map').textContent=s.pulse&&canHavePulse(s.rhythm)&&s.sys>0&&s.dia>0?Math.round((s.sys+2*s.dia)/3):'—';$('shocks').textContent=s.shocks;$('status').textContent=s.status;$('nibpStatus').textContent=s.nibp;$('charge').disabled=!room||s.charge!=='idle';$('charge').textContent=s.charge==='charging'?'CARGANDO '+Math.max(1,Math.ceil((3100-(Date.now()-(s.chargeAt||Date.now())))/1000))+' s':s.charge==='ready'?'CARGADO':'CARGAR';$('charge').classList.toggle('sva-charging',s.charge==='charging');$('shock').classList.toggle('sva-ready',!!room&&s.charge==='ready');$('shock').disabled=!room||s.charge!=='ready';$('disarm').disabled=!room||s.charge==='idle';$('energy').disabled=s.charge!=='idle';$('cpr').textContent=s.cprStarted?'Pausar':s.cprElapsed?'Continuar':'Iniciar cronómetro';$('teacher').classList.toggle('show',isTeacher()&&!!room);$('create').disabled=!isTeacher();$('role').textContent=isTeacher()?'Profesor autenticado':'Alumno / monitor (sin permisos de profesor)';const es=Object.values(s.events||{}).sort((a,b)=>a.at-b.at);$('log').replaceChildren();if(!es.length)$('log').textContent='Sin intervenciones.';else for(const e of es){const div=document.createElement('div');div.textContent=fmt(e.t)+' · '+e.name;$('log').appendChild(div)}remote=false}
+// Progreso de recuperación visible incluso entre actualizaciones remotas.
+setInterval(()=>{if(state.physMode==='rosc'&&state.physSince){$('recoveryProgress').textContent='RCE · '+Math.min(100,Math.floor((Date.now()-state.physSince)/750))+'% de recuperación estimada'}},500);
+// Cuenta atrás visible también en los dispositivos conectados.
+setInterval(()=>{if(state.charge==='charging'&&room){const left=Math.max(1,Math.ceil((3100-(Date.now()-(state.chargeAt||Date.now())))/1000));$('charge').textContent='CARGANDO '+left+' s'}},200);
+function report(){const es=Object.values(state.events||{}).sort((a,b)=>a.at-b.at),rows=$('reportRows');rows.replaceChildren();for(const e of es){const tr=document.createElement('tr');for(const t of [fmt(e.t),e.name]){const td=document.createElement('td');td.textContent=t;tr.appendChild(td)}rows.appendChild(tr)}$('reportMeta').textContent='Escenario: '+$('protocol').selectedOptions[0].text+' · Duración: '+fmt(seconds())+' · Descargas: '+state.shocks;$('report').style.display='block';$('report').scrollIntoView()}
+function error(e){$('connection').textContent='Error: '+(e.code||e.message||String(e));console.error(e)}
+async function ensureAnonymous(){if(user)return user;const cred=await signInAnonymously(auth);return cred.user}
+async function enter(code){code=code.toUpperCase().trim();if(!validRoom(code)){alert('El código debe tener 8 letras o números.');return}try{await ensureAnonymous();const snapshot=await get(ref(db,'rooms/'+code+'/meta'));if(!snapshot.exists()){alert('No existe esa sesión. El profesor debe crearla primero.');return}if(unsub)unsub();room=code;$('room').value=code;history.replaceState(null,'','#'+code);unsub=onValue(ref(db,'rooms/'+code+'/state'),snap=>{if(snap.exists()){state={...defaults(),...snap.val()};syncUI();$('connection').textContent='Conectado · '+code}else $('connection').textContent='Esperando estado…'},error)}catch(e){error(e)}}
+$('join').onclick=()=>enter($('room').value);
+$('login').onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){if(e.code==='auth/popup-blocked'||e.code==='auth/operation-not-supported-in-this-environment')await signInWithRedirect(auth,new GoogleAuthProvider());else error(e)}};
+$('logout').onclick=()=>signOut(auth).catch(error);
+getRedirectResult(auth).catch(error);
+onAuthStateChanged(auth,u=>{user=u;$('login').hidden=!!u&&!u.isAnonymous;$('logout').hidden=!u||u.isAnonymous;syncUI();if(!room&&location.hash.length===9)enter(location.hash.slice(1))});
+$('create').onclick=async()=>{if(!isTeacher())return;const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';for(let attempt=0;attempt<5;attempt++){const a=new Uint8Array(8);crypto.getRandomValues(a);const code=Array.from(a,n=>alphabet[n%alphabet.length]).join('');try{const meta=ref(db,'rooms/'+code+'/meta');const result=await runTransaction(meta,current=>current===null?{owner:TEACHER,created:Date.now()}:undefined,{applyLocally:false});if(!result.committed)continue;await set(ref(db,'rooms/'+code+'/state'),defaults());await enter(code);return}catch(e){error(e);return}}alert('No se pudo crear el código; inténtalo otra vez.')};
+async function patch(fields,teacher=false){if(!room){alert('Primero debes unirte a una sesión.');return}if(teacher&&!isTeacher())return;try{await update(ref(db,'rooms/'+room+'/state'),fields)}catch(e){error(e)}}
+async function log(name){if(!room)return;try{await push(ref(db,'rooms/'+room+'/state/events'),{at:Date.now(),t:Math.floor(seconds()),name})}catch(e){error(e)}}
+// Modelo educativo orientativo, no una predicción clínica ni un monitor médico.
+const arrestRhythms=new Set(['vf','vf_fine','vt','asystole','pea']);
+const rhythmHr={sinus:80,vf:0,vf_fine:0,vt:170,vt_pulse:170,asystole:0,pea:80,brady:45,tachy:145};
+const smooth=(from,to,t,duration)=>Math.round(from+(to-from)*Math.min(1,Math.max(0,t/duration)));
+const canHavePulse=r=>!arrestRhythms.has(r);
+function startRosc(){
+  // El ECG se organiza y reaparece el pulso, pero las constantes NO saltan a valores normales.
+  // Se fuerza un estado inicial explícito que se transmite a todos los dispositivos.
+  const now=Date.now();
+  const start={spo:Math.min(92,Math.max(85,Number(state.spo)||90)),et:Math.min(15,Math.max(3,Number(state.et)||3)),rr:0,sys:0,dia:0};
+  return {rhythm:'sinus',hr:92,pulse:true,apnea:false,spo:start.spo,et:start.et,rr:0,sys:0,dia:0,
+    nibp:'RCE: esperando presión arterial medible',physMode:'rosc',physSince:now,physFrom:start,
+    manualOverrides:{},autoPhys:true,status:'RCE confirmada · constantes recuperándose gradualmente'};
+}
+function transitionForRhythm(r){
+  const arrest=arrestRhythms.has(r),previousArrest=arrestRhythms.has(state.rhythm);
+  const from={spo:state.spo,et:state.et,rr:state.rr,sys:state.sys,dia:state.dia};
+  const next={rhythm:r,hr:rhythmHr[r],pulse:!arrest,physSince:Date.now(),physFrom:from,physMode:arrest?'arrest':previousArrest?'rosc':r==='vt_pulse'?'vt_pulse':'normal',manualOverrides:{}};
+  if(state.autoPhys!==false){
+    if(arrest){next.apnea=true;next.rr=0;next.sys=0;next.dia=0;next.et=state.cprStarted?12:3;next.pulse=false;next.nibp='Sin presión arterial pulsátil';}
+    else if(previousArrest){return {...next,...startRosc(),rhythm:r,hr:rhythmHr[r]};}
+    else if(r==='vt_pulse'){next.apnea=false;next.rr=20;next.et=30;next.sys=100;next.dia=65;next.spo=96;}
+    else{next.apnea=false;next.rr=14;}
+  }
+  return next;
+}
+$('rhythm').onchange=()=>patch(transitionForRhythm($('rhythm').value),true);
+$('resumeAuto').onclick=()=>patch({autoPhys:true,manualOverrides:{},physSince:Date.now(),physFrom:{spo:state.spo,et:state.et,rr:state.rr,sys:state.sys,dia:state.dia}},true);
+for(const [id,k,max] of [['hrIn','hr',250],['spoIn','spo',100],['etIn','et',100],['rrIn','rr',60],['sysIn','sys',300],['diaIn','dia',200]])$(id).onchange=()=>patch({[k]:clamp($(id).value,0,max),['manualOverrides/'+k]:true},true);
+for(const [id,k] of [['pulse','pulse'],['apnea','apnea']])$(id).onchange=()=>{if(k==='pulse'&&!canHavePulse(state.rhythm)){alert('Este ritmo corresponde a parada: no puede existir pulso efectivo. Para simular TV con pulso selecciona «TV con pulso».');syncUI();return}patch({[k]:$(id).checked,['manualOverrides/'+k]:true},true)};
+// V7: frecuencia cardiaca variable en pasos discretos garantizados (si no hay bloqueo manual).
+// Variabilidad fisiológica leve: un solo dispositivo (profesor) publica valores.
+// Se mantiene la misma base durante un escenario; nunca se modifica un ajuste manual.
+// La presión arterial se mantiene hasta que se solicite otra medición del manguito.
+let variationKey='', variationBase=null, variationBusy=false, variationStep=-1;
+const limit=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+setInterval(async()=>{
+ if(!isTeacher()||!room||variationBusy||state.autoPhys===false)return;
+ if(state.physMode!=='normal'||!state.pulse||!canHavePulse(state.rhythm)||state.apnea){variationBase=null;variationKey='';return}
+ const key=room+'|'+state.rhythm+'|'+state.physSince;
+ if(key!==variationKey){variationKey=key;variationBase={hr:Number(state.hr),spo:Number(state.spo),et:Number(state.et),rr:Number(state.rr)};variationStep=-1}
+ if(!variationBase)return;
+ const step=Math.floor(Date.now()/6000);
+ if(step===variationStep)return;
+ variationStep=step;
+ const locked=state.manualOverrides||{},p={};
+ // Ondulaciones discretas y limitadas; no se acumulan ni derivan indefinidamente.
+ const wobble=(amplitude,seed)=>Math.round(amplitude*Math.sin(step*0.79+seed)*0.75+amplitude*0.25*Math.sin(step*0.31+seed*2));
+ const targets={
+  hr:limit(variationBase.hr+[-2,-1,1,2,0,1,-1,0][step%8],35,220),
+  spo:limit(variationBase.spo+wobble(1,2),0,100),
+  et:limit(variationBase.et+wobble(2,3),0,100),
+  rr:limit(variationBase.rr+wobble(1,4),0,60)
+ };
+ for(const [k,v] of Object.entries(targets))if(!locked[k]&&state[k]!==v)p[k]=v;
+ if(Object.keys(p).length){variationBusy=true;try{await patch(p,true)}finally{variationBusy=false}}
+},1800);
+// Solo el profesor calcula y escribe la evolución; los demás dispositivos reciben Firebase.
+let physBusy=false;
+setInterval(async()=>{
+ if(!isTeacher()||!room||state.autoPhys===false||!state.physSince||physBusy)return;
+ const elapsed=Math.max(0,(Date.now()-state.physSince)/1000),from=state.physFrom||{},locked=state.manualOverrides||{},p={};
+ const put=(key,value)=>{if(!locked[key]&&state[key]!==value)p[key]=value};
+ if(state.physMode==='vt_pulse'){
+   put('sys',smooth(Number(from.sys??120),100,elapsed,15));put('dia',smooth(Number(from.dia??80),65,elapsed,15));
+   put('et',smooth(Number(from.et??35),30,elapsed,15));put('spo',smooth(Number(from.spo??98),96,elapsed,25));
+   put('rr',smooth(Number(from.rr??14),20,elapsed,15));put('apnea',false);put('pulse',true);
+ }else if(state.physMode==='arrest'){
+   // La SpO2 deja de ser fiable sin pulso; la cifra transitoria se conserva y se oculta en pantalla.
+   // La EtCO2 disminuye rápidamente al perder circulación y aumenta si se inicia RCP.
+   const targetEt=state.cprStarted?14:3;
+   put('et',smooth(Number(from.et??35),targetEt,elapsed,12));
+   put('sys',0);put('dia',0);put('rr',0);put('apnea',true);put('pulse',false);
+ }else if(state.physMode==='rosc'){
+   // Recuperación en fases: pulso/ECG organizados al inicio, parámetros graduales.
+   // La EtCO2 puede aumentar rápidamente con RCE; PA y SpO2 tardan más.
+   put('et',smooth(Number(from.et??3),38,elapsed,9));
+   put('sys',smooth(Number(from.sys??0),115,elapsed,50));put('dia',smooth(Number(from.dia??0),72,elapsed,50));
+   put('spo',smooth(Number(from.spo??92),98,elapsed,75));
+   put('rr',smooth(Number(from.rr??0),15,elapsed,35));put('apnea',false);put('pulse',canHavePulse(state.rhythm));
+ }
+ if(Object.keys(p).length){physBusy=true;try{await patch(p,true)}finally{physBusy=false}}
+},1400);
+$('roscTeacher').onclick=async()=>{if(!isTeacher()||!room)return;await patch(startRosc(),true);await log('RCE confirmada por profesor · recuperación progresiva')};
+$('after').onchange=()=>patch({after:$('after').value},true);$('energy').onchange=()=>patch({energy:+$('energy').value});$('sync').onchange=()=>patch({sync:$('sync').checked});$('protocol').onchange=()=>patch({protocol:$('protocol').value});
+$('charge').onclick=async()=>{if(state.charge!=='idle')return;await unlockAudio();await patch({charge:'charging',status:'Cargando '+state.energy+' J…',chargeAt:Date.now()});setTimeout(async()=>{if(!room)return;try{const snap=await get(ref(db,'rooms/'+room+'/state'));if(snap.val()?.charge==='charging'&&snap.val()?.chargeAt===state.chargeAt)await patch({charge:'ready',status:'CARGA COMPLETA · '+state.energy+' J'})}catch(e){error(e)}},3100)};
+$('disarm').onclick=()=>patch({charge:'idle',status:'Desarmado · energía cancelada'});
+$('shock').onclick=async()=>{if(state.charge!=='ready')return;await unlockAudio();if(state.sync&&['vf','vf_fine','asystole'].includes(state.rhythm)){await patch({status:'SYNC: no se detecta onda R fiable. Desactiva SYNC.'});return}try{const count=(state.shocks||0)+1;await patch({charge:'idle',shocks:count,status:'DESCARGA SIMULADA Nº '+count+' · '+state.energy+' J'});await log('Descarga #'+count+' · '+state.energy+' J');if(isTeacher()&&state.after!=='same'){const r=state.after;await patch(r==='sinus'?startRosc():transitionForRhythm(r),true)}}catch(e){error(e)}};
+$('cpr').onclick=()=>patch(state.cprStarted?{cprElapsed:seconds()*1000,cprStarted:0}:{cprStarted:Date.now()});
+$('reset').onclick=async()=>{await patch({cprElapsed:0,cprStarted:0,events:null,shocks:0});};
+$('restore').onclick=()=>{if(isTeacher()&&confirm('¿Restablecer el paciente y borrar las actuaciones de esta sesión?'))set(ref(db,'rooms/'+room+'/state'),defaults()).catch(error)};
+$('nibp').onclick=()=>{if(!room)return;$('nibpStatus').textContent='Midiendo…';setTimeout(()=>patch({nibp:(state.pulse?'Última lectura: '+state.sys+'/'+state.dia+' mmHg':'Sin lectura válida (sin pulso)')}),2500)};
+for(const [id,name]of [['epi','Adrenalina 1 mg'],['amio300','Amiodarona 300 mg'],['amio150','Amiodarona 150 mg']])$(id).onclick=()=>log(name);
+$('roscc').onclick=async()=>{if(!isTeacher()){alert('La recuperación de circulación debe confirmarla el profesor.');return}await patch(startRosc(),true);await log('RCE confirmada · recuperación progresiva')};
+$('endcase').onclick=report;
+// Audio de desfibrilador sintetizado localmente: no requiere archivos ni cambios en Firebase.
+// Safari/iPad exige un toque del usuario antes de permitir reproducir sonido.
+async function unlockAudio(){
+  try{
+    audio=audio||new(window.AudioContext||window.webkitAudioContext)();
+    await audio.resume();
+    soundOn=true;audioReady=true;$('sound').textContent='🔊 Silenciar';
+    updateDefibAudio(state);
+  }catch(e){$('alarmStatus').textContent='Pulsa Activar sonido para habilitar el audio';}
+}
+function stopChargeSound(){
+  if(!chargingOsc)return;
+  try{const t=audio.currentTime;chargingGain.gain.cancelScheduledValues(t);chargingGain.gain.setTargetAtTime(0,t,.035);chargingOsc.stop(t+.18)}catch(e){}
+  chargingOsc=null;chargingGain=null;
+}
+function startChargeSound(){
+  if(!soundOn||!audio||chargingOsc)return;
+  const osc=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime;
+  osc.type='sawtooth';osc.frequency.setValueAtTime(190,t);
+  osc.frequency.exponentialRampToValueAtTime(870,t+3.1);
+  g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.045,t+.12);
+  osc.connect(g).connect(audio.destination);osc.start();chargingOsc=osc;chargingGain=g;
+}
+function shockSound(){
+  if(!soundOn||!audio)return;
+  const t=audio.currentTime,seconds=.48,samples=Math.floor(audio.sampleRate*seconds),buffer=audio.createBuffer(1,samples,audio.sampleRate),data=buffer.getChannelData(0);
+  for(let i=0;i<samples;i++){const q=i/samples;data[i]=(Math.random()*2-1)*Math.exp(-q*10)+Math.sin(i/audio.sampleRate*2*Math.PI*(95-65*q))*.38*Math.exp(-q*7)}
+  const src=audio.createBufferSource(),gain=audio.createGain(),filter=audio.createBiquadFilter();
+  filter.type='lowpass';filter.frequency.setValueAtTime(2400,t);filter.frequency.exponentialRampToValueAtTime(200,t+seconds);
+  gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.24,t+.008);gain.gain.exponentialRampToValueAtTime(.0001,t+seconds);
+  src.buffer=buffer;src.connect(filter).connect(gain).connect(audio.destination);src.start(t);
+}
+function updateDefibAudio(s){
+  if(s.charge==='charging'){
+    if(soundOn&&audio&&!chargingOsc)startChargeSound();
+  }else if(chargingOsc){stopChargeSound();}
+  if((s.shocks||0)>lastShocks&&lastCharge!=='idle')shockSound();
+  lastCharge=s.charge;lastShocks=s.shocks||0;
+}
+$('sound').onclick=async()=>{
+  if(!soundOn){await unlockAudio()}
+  else{soundOn=false;stopChargeSound();$('sound').textContent='🔊 ACTIVAR SONIDO EN ESTE DISPOSITIVO'}
+};
+function beep(freq=800,dur=.08,vol=.04){if(!soundOn||!audio)return;const osc=audio.createOscillator(),gain=audio.createGain();osc.frequency.value=freq;gain.gain.value=vol;osc.connect(gain).connect(audio.destination);osc.start();osc.stop(audio.currentTime+dur)}
+let pulseLast=0,alarmLast=0;
+setInterval(()=>{
+ const now=Date.now();$('timer').textContent=fmt(seconds());
+ if(!soundOn||!audio||audio.state!=='running'){$('alarmStatus').textContent='Audio desactivado: pulsa Activar sonido en ESTE dispositivo';return}
+ const problems=[];
+ if(!state.pulse)problems.push('Sin pulso: SpO₂ no fiable');else if(state.spo<90)problems.push('SpO₂ baja');
+ if(state.apnea||state.rr===0)problems.push('Apnea');
+ if(state.et<10&&!state.apnea)problems.push('EtCO₂ bajo');
+ $('alarmStatus').textContent=problems.length?'⚠ '+problems.join(' · '):'Sonido de ECG activado';
+ // Pitido de QRS organizado; no confundir con confirmación de pulso en AESP.
+ const organized=!['vf','vf_fine','asystole'].includes(state.rhythm);
+ const rate=Number(state.hr)||0;
+ if(organized&&rate>0&&now-pulseLast>=60000/Math.max(20,Math.min(250,rate))){beep(state.pulse?920:680,.055,.045);pulseLast=now}
+ if(problems.length&&$('alarms').checked&&now-alarmLast>4000){beep(440,.14,.035);alarmLast=now}
+},100);
+
+function wave(kind,t){const s=state,f=s.hr||80,rr=s.rr||14,r=s.rhythm;if(kind==='ecg'){if(r==='asystole')return .5+Math.sin(t*12)*.003;if(r==='vf')return .5+.19*Math.sin(t*19)+.12*Math.sin(t*31)+.08*Math.sin(t*53);if(r==='vf_fine')return .5+.032*Math.sin(t*19)+.022*Math.sin(t*31)+.012*Math.sin(t*53);let rate=f/60,p=t*rate%1;if(r==='vt'||r==='vt_pulse')return .5-.38*Math.sin(Math.PI*Math.min(1,p/.65))*(p<.65?1:0);return .55-.07*Math.exp(-(((p-.17)/.055)**2))+.09*Math.exp(-(((p-.38)/.018)**2))-.42*Math.exp(-(((p-.41)/.012)**2))+.14*Math.exp(-(((p-.44)/.02)**2))-.10*Math.exp(-(((p-.7)/.11)**2))}if(kind==='resp')return s.apnea||!rr?.5:.5+.29*Math.sin(2*Math.PI*t*rr/60);if(kind==='pleth'){if(!s.pulse||!canHavePulse(r))return .8;let p=t*f/60%1;return .78-.5*Math.exp(-(((p-.17)/.13)**2))-.12*Math.exp(-(((p-.46)/.065)**2))}let p=t*rr/60%1,v=p<.14?p/.14:p<.53?1:p<.68?1-(p-.53)/.15:0;return .82-(s.apnea&&!s.cprStarted?0:v)*(s.et/100)*.72-.015*Math.sin(t*5)}
+function draw(id,kind,color){const c=$(id),ctx=c.getContext('2d'),w=c.width,h=c.height;ctx.fillStyle='#03090b';ctx.fillRect(0,0,w,h);ctx.strokeStyle=color;ctx.lineWidth=2.2;ctx.beginPath();for(let x=0;x<w;x++){const t=phase+x/w*5,y=wave(kind,t)*h;x?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.stroke()}
+function render(){draw('ecg','ecg','#5bff77');draw('pleth','pleth','#55dfff');draw('capno','capno','#ffe06b');draw('resp','resp','#f3f5f7');phase+=.035;requestAnimationFrame(render)}syncUI();render();
+</script><script>if ('serviceWorker' in navigator) {window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').then(r=>r.update()).catch(e=>console.warn('SW:',e)));}</script></body></html>
